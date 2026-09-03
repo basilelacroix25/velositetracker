@@ -51,7 +51,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
-  #map { position: absolute; top: 0; bottom: 96px; left: 0; right: 0; }
+  #map { position: absolute; top: 0; bottom: 96px; left: 0; right: 0; background: #f2f2f0; }
   #controls {
     position: absolute; bottom: 0; left: 0; right: 0; height: 96px;
     background: #14181f; color: #f0f0f0; display: flex; flex-direction: column;
@@ -69,19 +69,41 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .legend {
     position: absolute; top: 10px; right: 10px; background: white; padding: 10px 14px;
     border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.3); font-size: 13px; z-index: 1000;
+    min-width: 168px;
   }
-  #map { background: #f2f2f0; }
-  .legend div { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  .legend div.row2 { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
   .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .mode-group { margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e2e2; }
+  .mode-group label { display: block; font-size: 12.5px; margin: 3px 0; cursor: pointer; }
+  .spark-title { font-size: 11px; color: #666; margin-top: 6px; margin-bottom: 2px; }
+  .spark-empty { font-size: 11px; color: #999; font-style: italic; }
+  .tooltip-body { font-size: 13px; line-height: 1.4; }
+  .circulation-panel {
+    position: absolute; top: 10px; left: 10px; background: white; padding: 10px 14px;
+    border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.3); font-size: 13px; z-index: 1000;
+    width: 230px;
+  }
+  .circulation-panel .subtitle { font-size: 11px; color: #666; margin: 2px 0 6px; line-height: 1.3; }
 </style>
 </head>
 <body>
 <div id="map"></div>
+<div class="circulation-panel">
+  <strong>Vélos en circulation</strong>
+  <div class="subtitle">Estimation sur 24h glissantes — plus la courbe est haute, plus il y a de vélos hors des stations</div>
+  <div id="circulationChart"></div>
+</div>
 <div class="legend">
   <strong>Vélos disponibles</strong>
-  <div><span class="dot" style="background:#ff8fc7"></span> Mécanique</div>
-  <div><span class="dot" style="background:#7fd4f5"></span> Électrique</div>
-  <div style="margin-top:4px">Taille du cercle = total dispo</div>
+  <div class="row2"><span class="dot" style="background:#ff8fc7"></span> Mécanique</div>
+  <div class="row2"><span class="dot" style="background:#7fd4f5"></span> Électrique</div>
+  <div class="row2"><span class="dot" style="background:#fff; border:2px solid #111; box-sizing:border-box; width:8px; height:8px;"></span> Station vide</div>
+  <div style="margin-top:4px; font-size:12px; color:#555;">Anneau extérieur = total<br>Cercle intérieur = la plus petite des deux valeurs</div>
+  <div class="mode-group">
+    <label><input type="radio" name="mode" value="both" checked> Tout (fusionné)</label>
+    <label><input type="radio" name="mode" value="elec"> Électrique seul</label>
+    <label><input type="radio" name="mode" value="mech"> Mécanique seul</label>
+  </div>
 </div>
 <div id="controls">
   <div id="timeLabel">--</div>
@@ -97,6 +119,10 @@ const STATIONS = __STATIONS_JSON__;
 const TIMESTAMPS = __TIMESTAMPS_JSON__;
 const DATA = __DATA_JSON__;
 
+const MECH_COLOR = '#ff8fc7';
+const ELEC_COLOR = '#7fd4f5';
+const WINDOW_MS = 24 * 3600 * 1000; // fenêtre du mini-graphique : 24h
+
 const map = L.map('map').setView([47.238, 6.022], 14);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
@@ -104,29 +130,20 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   subdomains: 'abcd'
 }).addTo(map);
 
-// Un marker composite par station : deux demi-cercles (méca / élec) approximés
-// par deux cercles superposés avec rayon proportionnel, + tooltip texte.
-const markers = {};
+let currentIndex = 0;
+let MODE = 'both'; // 'both' | 'elec' | 'mech'
 
+// Taille = base + valeur × facteur (échelle linéaire, pas un simple plancher)
+// afin de garantir un écart visible entre l'anneau extérieur et le cercle
+// intérieur dès que les deux catégories diffèrent — même sur de petites
+// valeurs (ex: total=3, plus petite=1 → rayons 9 et 5, pas 3 et 3).
+const RADIUS_BASE = 3;
+const RADIUS_SCALE = 2;
 function radiusFor(count) {
-  if (count <= 0) return 3;
-  return 4 + Math.sqrt(count) * 3;
-}
-
-for (const [id, st] of Object.entries(STATIONS)) {
-  const mechCircle = L.circleMarker([st.lat, st.lon], {
-    radius: 4, color: '#ff8fc7', fillColor: '#ff8fc7', fillOpacity: 0.75, weight: 1
-  }).addTo(map);
-  const elecCircle = L.circleMarker([st.lat, st.lon], {
-    radius: 4, color: '#7fd4f5', fillColor: '#7fd4f5', fillOpacity: 0.6, weight: 1
-  }).addTo(map);
-  const tooltip = L.tooltip({ direction: 'top', offset: [0, -6] });
-  mechCircle.bindTooltip(tooltip);
-  markers[id] = { mechCircle, elecCircle, name: st.name };
+  return RADIUS_BASE + count * RADIUS_SCALE;
 }
 
 function fmtTimestamp(ts) {
-  // ts est ISO UTC style 2026-08-14T18:00:00Z -> affichage local FR
   const d = new Date(ts);
   return d.toLocaleString('fr-FR', {
     weekday: 'short', day: '2-digit', month: '2-digit',
@@ -134,34 +151,188 @@ function fmtTimestamp(ts) {
   });
 }
 
+// Construit un mini sparkline SVG (méca + élec) sur les 24h précédant idx
+function buildSparkline(stationId, idx) {
+  const endTs = TIMESTAMPS[idx];
+  const endTime = Date.parse(endTs);
+  const points = [];
+
+  for (let i = idx; i >= 0; i--) {
+    const ts = TIMESTAMPS[i];
+    const t = Date.parse(ts);
+    if (endTime - t > WINDOW_MS) break;
+    const d = (DATA[ts] || {})[stationId];
+    if (d) points.push({ t, mech: d.mechanical, elec: d.electrical });
+  }
+  points.reverse();
+
+  if (points.length < 2) {
+    return '<div class="spark-empty">Historique insuffisant (&lt; 24h de données)</div>';
+  }
+
+  const W = 160, H = 46, PAD = 3;
+  let maxVal = 1;
+  for (const p of points) maxVal = Math.max(maxVal, p.mech, p.elec);
+
+  const xStep = (W - 2 * PAD) / (points.length - 1);
+  const yFor = (v) => H - PAD - (v / maxVal) * (H - 2 * PAD);
+
+  const mechPts = points.map((p, i) => `${(PAD + i * xStep).toFixed(1)},${yFor(p.mech).toFixed(1)}`).join(' ');
+  const elecPts = points.map((p, i) => `${(PAD + i * xStep).toFixed(1)},${yFor(p.elec).toFixed(1)}`).join(' ');
+  const zeroY = yFor(0).toFixed(1);
+
+  return `
+    <div class="spark-title">Vélos dispo — 24h précédentes</div>
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <line x1="${PAD}" y1="${zeroY}" x2="${W - PAD}" y2="${zeroY}"
+            stroke="#bbb" stroke-width="1" stroke-dasharray="3,2" />
+      <text x="${W - PAD}" y="${Number(zeroY) - 2}" font-size="8" fill="#999" text-anchor="end">station vide</text>
+      <polyline points="${mechPts}" fill="none" stroke="${MECH_COLOR}" stroke-width="2" />
+      <polyline points="${elecPts}" fill="none" stroke="${ELEC_COLOR}" stroke-width="2" />
+    </svg>`;
+}
+
+function tooltipHtml(stationId, name) {
+  const ts = TIMESTAMPS[currentIndex];
+  const d = (DATA[ts] || {})[stationId];
+  const header = d
+    ? `Méca: ${d.mechanical} · Élec: ${d.electrical}<br>Total: ${d.total} · Places libres: ${d.docks}`
+    : 'Pas de données à cet instant';
+  return `<div class="tooltip-body"><strong>${name}</strong><br>${header}${buildSparkline(stationId, currentIndex)}</div>`;
+}
+
+// Graphique global : nombre estimé de vélos "en circulation" (hors stations),
+// calculé comme (pic de vélos docké sur la fenêtre 24h) - (vélos dockés à l'instant t).
+// C'est une estimation : on ne connaît pas la taille exacte de la flotte, donc
+// on utilise le pic observé sur la fenêtre comme référence approximative
+// (généralement atteint la nuit, quand quasi personne ne roule).
+function buildCirculationChart(idx) {
+  const endTs = TIMESTAMPS[idx];
+  const endTime = Date.parse(endTs);
+  const points = [];
+
+  for (let i = idx; i >= 0; i--) {
+    const ts = TIMESTAMPS[i];
+    const t = Date.parse(ts);
+    if (endTime - t > WINDOW_MS) break;
+    const frame = DATA[ts];
+    if (!frame) continue;
+    let totalDocked = 0;
+    let n = 0;
+    for (const d of Object.values(frame)) { totalDocked += d.total; n++; }
+    if (n > 0) points.push({ t, totalDocked });
+  }
+  points.reverse();
+
+  if (points.length < 2) {
+    return '<div class="spark-empty">Historique insuffisant (&lt; 24h de données)</div>';
+  }
+
+  const peakDocked = Math.max(...points.map(p => p.totalDocked));
+  const series = points.map(p => ({ t: p.t, circulation: Math.max(0, peakDocked - p.totalDocked) }));
+
+  const W = 200, H = 60, PAD = 4;
+  const maxCirc = Math.max(1, ...series.map(p => p.circulation));
+  const xStep = (W - 2 * PAD) / (series.length - 1);
+  const yFor = (v) => H - PAD - (v / maxCirc) * (H - 2 * PAD);
+
+  const pts = series.map((p, i) => `${(PAD + i * xStep).toFixed(1)},${yFor(p.circulation).toFixed(1)}`).join(' ');
+  const areaPts = `${PAD},${H - PAD} ${pts} ${(W - PAD).toFixed(1)},${H - PAD}`;
+  const current = series[series.length - 1].circulation;
+
+  return `
+    <div style="font-size:12px; margin-bottom:2px;">
+      Actuellement : <strong>${current}</strong> vélo(s) estimé(s) hors stations
+      <span style="color:#999;">(pic référence: ${peakDocked} dockés)</span>
+    </div>
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <polygon points="${areaPts}" fill="#ff8fc7" fill-opacity="0.15" stroke="none" />
+      <polyline points="${pts}" fill="none" stroke="#e0559f" stroke-width="2" />
+    </svg>`;
+}
+
+function updateCirculationPanel(idx) {
+  document.getElementById('circulationChart').innerHTML = buildCirculationChart(idx);
+}
+
+// Deux cercles concentriques par station : "outer" (anneau, valeur la plus
+// grande) et "inner" (toujours ramené au premier plan, valeur la plus
+// petite) — ainsi la plus petite valeur n'est jamais masquée par la plus
+// grande, quel que soit le sens (méca > élec ou l'inverse).
+const markers = {};
+
+for (const [id, st] of Object.entries(STATIONS)) {
+  const outer = L.circleMarker([st.lat, st.lon], { weight: 1, fillOpacity: 0.8 }).addTo(map);
+  const inner = L.circleMarker([st.lat, st.lon], { weight: 1, fillOpacity: 0.9 }).addTo(map);
+
+  outer.bindTooltip(() => tooltipHtml(id, st.name), { direction: 'top', sticky: true });
+  inner.bindTooltip(() => tooltipHtml(id, st.name), { direction: 'top', sticky: true });
+
+  markers[id] = { outer, inner, name: st.name };
+}
+
 function renderFrame(idx) {
+  currentIndex = idx;
   const ts = TIMESTAMPS[idx];
   document.getElementById('timeLabel').textContent = fmtTimestamp(ts);
   const frame = DATA[ts] || {};
+  updateCirculationPanel(idx);
 
   for (const [id, m] of Object.entries(markers)) {
     const d = frame[id];
     if (!d) {
-      m.mechCircle.setRadius(3);
-      m.elecCircle.setRadius(0);
-      m.mechCircle.setTooltipContent(`${m.name}<br>Pas de données`);
+      m.outer.setStyle({ radius: 3, color: '#ccc', fillColor: '#ccc' });
+      m.inner.setStyle({ radius: 0, opacity: 0, fillOpacity: 0 });
       continue;
     }
-    m.mechCircle.setRadius(radiusFor(d.mechanical));
-    m.elecCircle.setRadius(radiusFor(d.electrical));
-    m.mechCircle.setLatLng(m.mechCircle.getLatLng());
-    m.mechCircle.setTooltipContent(
-      `<strong>${m.name}</strong><br>` +
-      `Méca: ${d.mechanical} · Élec: ${d.electrical}<br>` +
-      `Total: ${d.total} · Places libres: ${d.docks}`
-    );
+
+    const mech = d.mechanical, elec = d.electrical;
+
+    if (MODE === 'elec') {
+      if (elec === 0) {
+        m.outer.setStyle({ radius: 5, color: '#111', fillColor: '#fff', weight: 2, opacity: 1, fillOpacity: 1 });
+        m.inner.setStyle({ radius: 0, opacity: 0, fillOpacity: 0 });
+      } else {
+        m.outer.setStyle({ radius: radiusFor(elec), color: ELEC_COLOR, fillColor: ELEC_COLOR, weight: 1, opacity: 1, fillOpacity: 0.8 });
+        m.inner.setStyle({ radius: 0, opacity: 0, fillOpacity: 0 });
+      }
+    } else if (MODE === 'mech') {
+      if (mech === 0) {
+        m.outer.setStyle({ radius: 5, color: '#111', fillColor: '#fff', weight: 2, opacity: 1, fillOpacity: 1 });
+        m.inner.setStyle({ radius: 0, opacity: 0, fillOpacity: 0 });
+      } else {
+        m.outer.setStyle({ radius: radiusFor(mech), color: MECH_COLOR, fillColor: MECH_COLOR, weight: 1, opacity: 1, fillOpacity: 0.8 });
+        m.inner.setStyle({ radius: 0, opacity: 0, fillOpacity: 0 });
+      }
+    } else if (mech === 0 && elec === 0) {
+      // Station totalement vide : point noir creux plutôt que les deux cercles colorés
+      m.outer.setStyle({ radius: 5, color: '#111', fillColor: '#fff', weight: 2, opacity: 1, fillOpacity: 1 });
+      m.inner.setStyle({ radius: 0, opacity: 0, fillOpacity: 0 });
+    } else {
+      const total = mech + elec;
+      const smaller = Math.min(mech, elec);
+      const smallerIsMech = mech <= elec;
+      const outerColor = smallerIsMech ? ELEC_COLOR : MECH_COLOR; // représente la plus grande valeur
+      const innerColor = smallerIsMech ? MECH_COLOR : ELEC_COLOR; // toujours au premier plan
+
+      m.outer.setStyle({ radius: radiusFor(total), color: outerColor, fillColor: outerColor, opacity: 1, fillOpacity: 0.75 });
+      m.inner.setStyle({ radius: radiusFor(smaller), color: innerColor, fillColor: innerColor, opacity: 1, fillOpacity: 0.95 });
+    }
+
+    m.inner.bringToFront();
   }
 }
 
 const slider = document.getElementById('slider');
 slider.max = TIMESTAMPS.length - 1;
-
 slider.addEventListener('input', () => renderFrame(parseInt(slider.value)));
+
+document.querySelectorAll('input[name="mode"]').forEach((radio) => {
+  radio.addEventListener('change', (e) => {
+    MODE = e.target.value;
+    renderFrame(currentIndex);
+  });
+});
 
 let playing = false;
 let playInterval = null;
