@@ -1,0 +1,41 @@
+name: Collecte VéloCité
+
+on:
+  schedule:
+    # Toutes les 15 minutes (heure UTC). GitHub peut retarder légèrement
+    # en période de forte charge, ce n'est pas garanti à la seconde près.
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}   # permet de lancer manuellement depuis l'onglet Actions
+
+permissions:
+  contents: write
+
+concurrency:
+  group: velocite-collector
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Collecter un instantané
+        run: python collect_once.py
+
+      - name: Commit et push si changement
+        run: |
+          git config user.name "velocite-bot"
+          git config user.email "actions@github.com"
+          git add data/velocite_log.csv data/stations.json
+          git diff --cached --quiet || git commit -m "Instantané $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push
