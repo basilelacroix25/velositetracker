@@ -1,0 +1,194 @@
+{
+  "1": {
+    "name": "GARE VIOTTE (CB)",
+    "lat": 47.246419,
+    "lon": 6.022567,
+    "capacity": 30
+  },
+  "2": {
+    "name": "REMPARTS",
+    "lat": 47.243497,
+    "lon": 6.021877,
+    "capacity": 10
+  },
+  "3": {
+    "name": "BATTANT (CB)",
+    "lat": 47.239978,
+    "lon": 6.019691,
+    "capacity": 15
+  },
+  "4": {
+    "name": "FLORE",
+    "lat": 47.245763,
+    "lon": 6.028137,
+    "capacity": 11
+  },
+  "5": {
+    "name": "ISENBART",
+    "lat": 47.242745,
+    "lon": 6.025208,
+    "capacity": 10
+  },
+  "6": {
+    "name": "PARC MICAUD (CB)",
+    "lat": 47.242575,
+    "lon": 6.029757,
+    "capacity": 15
+  },
+  "7": {
+    "name": "GARE MOUILLERE",
+    "lat": 47.240147,
+    "lon": 6.033776,
+    "capacity": 18
+  },
+  "8": {
+    "name": "MARULAZ",
+    "lat": 47.239611,
+    "lon": 6.017099,
+    "capacity": 10
+  },
+  "9": {
+    "name": "LA CITY",
+    "lat": 47.235434,
+    "lon": 6.015261,
+    "capacity": 20
+  },
+  "10": {
+    "name": "8 SEPTEMBRE (CB)",
+    "lat": 47.237686,
+    "lon": 6.024183,
+    "capacity": 15
+  },
+  "11": {
+    "name": "JEAN CORNET",
+    "lat": 47.236363,
+    "lon": 6.028817,
+    "capacity": 10
+  },
+  "12": {
+    "name": "GRANVELLE (CB)",
+    "lat": 47.235437,
+    "lon": 6.025724,
+    "capacity": 15
+  },
+  "13": {
+    "name": "VICTOR HUGO (CB)",
+    "lat": 47.234749,
+    "lon": 6.029566,
+    "capacity": 14
+  },
+  "14": {
+    "name": "JACOBINS",
+    "lat": 47.234525,
+    "lon": 6.033161,
+    "capacity": 10
+  },
+  "15": {
+    "name": "LECOURBE",
+    "lat": 47.231188,
+    "lon": 6.026907,
+    "capacity": 10
+  },
+  "16": {
+    "name": "FONTAINE ARGENT",
+    "lat": 47.244981,
+    "lon": 6.032556,
+    "capacity": 11
+  },
+  "17": {
+    "name": "CHAMARS",
+    "lat": 47.232903,
+    "lon": 6.020116,
+    "capacity": 14
+  },
+  "18": {
+    "name": "CHAMARS ESPLANADE (CB)",
+    "lat": 47.23526,
+    "lon": 6.021363,
+    "capacity": 20
+  },
+  "19": {
+    "name": "REVOLUTION",
+    "lat": 47.239533,
+    "lon": 6.023395,
+    "capacity": 15
+  },
+  "20": {
+    "name": "TRISTAN BERNARD",
+    "lat": 47.247808,
+    "lon": 6.03642,
+    "capacity": 12
+  },
+  "21": {
+    "name": "LIBERTE",
+    "lat": 47.24746,
+    "lon": 6.028587,
+    "capacity": 12
+  },
+  "22": {
+    "name": "RIVOTTE",
+    "lat": 47.23219,
+    "lon": 6.035007,
+    "capacity": 12
+  },
+  "23": {
+    "name": "REPUBLIQUE",
+    "lat": 47.240099,
+    "lon": 6.02735,
+    "capacity": 10
+  },
+  "24": {
+    "name": "GRANGES",
+    "lat": 47.238129,
+    "lon": 6.026293,
+    "capacity": 12
+  },
+  "25": {
+    "name": "BERSOT",
+    "lat": 47.23886,
+    "lon": 6.029562,
+    "capacity": 10
+  },
+  "26": {
+    "name": "MAIRIE",
+    "lat": 47.236806,
+    "lon": 6.022309,
+    "capacity": 15
+  },
+  "27": {
+    "name": "LECLERC",
+    "lat": 47.242267,
+    "lon": 6.014448,
+    "capacity": 10
+  },
+  "28": {
+    "name": "MARIE LOUISE",
+    "lat": 47.248886,
+    "lon": 6.030818,
+    "capacity": 12
+  },
+  "29": {
+    "name": "GIBELOTTE",
+    "lat": 47.242184,
+    "lon": 6.009141,
+    "capacity": 12
+  },
+  "30": {
+    "name": "LEO LAGRANGE",
+    "lat": 47.24414,
+    "lon": 6.004416,
+    "capacity": 20
+  },
+  "31": {
+    "name": "IUT",
+    "lat": 47.247369,
+    "lon": 5.992249,
+    "capacity": 20
+  },
+  "32": {
+    "name": "CROUS UNIVERSITE",
+    "lat": 47.248488,
+    "lon": 5.986929,
+    "capacity": 42
+  }
+}
