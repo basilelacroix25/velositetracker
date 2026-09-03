@@ -70,6 +70,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     position: absolute; top: 10px; right: 10px; background: white; padding: 10px 14px;
     border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.3); font-size: 13px; z-index: 1000;
   }
+  #map { background: #f2f2f0; }
   .legend div { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
   .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 </style>
@@ -78,8 +79,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="map"></div>
 <div class="legend">
   <strong>Vélos disponibles</strong>
-  <div><span class="dot" style="background:#2c7be5"></span> Mécanique</div>
-  <div><span class="dot" style="background:#f5a623"></span> Électrique</div>
+  <div><span class="dot" style="background:#ff8fc7"></span> Mécanique</div>
+  <div><span class="dot" style="background:#7fd4f5"></span> Électrique</div>
   <div style="margin-top:4px">Taille du cercle = total dispo</div>
 </div>
 <div id="controls">
@@ -97,9 +98,10 @@ const TIMESTAMPS = __TIMESTAMPS_JSON__;
 const DATA = __DATA_JSON__;
 
 const map = L.map('map').setView([47.238, 6.022], 14);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors',
-  maxZoom: 19
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+  maxZoom: 19,
+  subdomains: 'abcd'
 }).addTo(map);
 
 // Un marker composite par station : deux demi-cercles (méca / élec) approximés
@@ -113,10 +115,10 @@ function radiusFor(count) {
 
 for (const [id, st] of Object.entries(STATIONS)) {
   const mechCircle = L.circleMarker([st.lat, st.lon], {
-    radius: 4, color: '#2c7be5', fillColor: '#2c7be5', fillOpacity: 0.75, weight: 1
+    radius: 4, color: '#ff8fc7', fillColor: '#ff8fc7', fillOpacity: 0.75, weight: 1
   }).addTo(map);
   const elecCircle = L.circleMarker([st.lat, st.lon], {
-    radius: 4, color: '#f5a623', fillColor: '#f5a623', fillOpacity: 0.55, weight: 1
+    radius: 4, color: '#7fd4f5', fillColor: '#7fd4f5', fillOpacity: 0.6, weight: 1
   }).addTo(map);
   const tooltip = L.tooltip({ direction: 'top', offset: [0, -6] });
   mechCircle.bindTooltip(tooltip);
